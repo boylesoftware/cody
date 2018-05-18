@@ -1,0 +1,17 @@
+{
+  "name": "cody-publisher",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": "~8.10"
+  },
+  "devDependencies": {
+    "eslint": "^4.19.0"
+  },
+  "scripts": {
+    "test": "eslint ."
+  },
+  "dependencies": {
+    "mime": "^2.3.1"
+  }
+}

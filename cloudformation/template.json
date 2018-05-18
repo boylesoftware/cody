@@ -1,0 +1,323 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+
+  "Parameters": {
+    "LambdaFunctionsBucket": {
+      "Description": "Name of the S3 bucket that contains the Lambda function packages.",
+      "Type": "String",
+      "MinLength": 3,
+      "MaxLength": 63,
+      "AllowedPattern": "[a-z0-9][a-z0-9.-]*"
+    },
+    "TargetBucket": {
+      "Description": "Name of the S3 bucket for published content. May contain ${repo} as a placeholder for the CodeCommit repository name.",
+      "Type": "String"
+    },
+    "TargetFolder": {
+      "Description": "Name of the folder in the target S3 bucket for published content, if any. May contain ${repo} as a placeholder for the CodeCommit repository name.",
+      "Type": "String"
+    },
+    "PublisherStatusTableProvisionedThroughput": {
+      "Description": "Read and write provisioned throughput in capacity units for the publisher status DynamoDB table.",
+      "Type": "Number",
+      "MinValue": 5,
+      "Default": 5
+    },
+    "PublisherActionsQueueMessageRetentionPeriod": {
+      "Description": "Number of seconds to keep unprocessed publisher actions in the queue before they are discarded.",
+      "Type": "Number",
+      "MinValue": 60,
+      "MaxValue": 1209600,
+      "Default": 86400
+    },
+    "CommitHandlerTimeout": {
+      "Description": "Maximum number of seconds allocated to the commit handler to complete converting a single commit to the queue of publisher actions.",
+      "Type": "Number",
+      "MinValue": 10,
+      "MaxValue": 300,
+      "Default": 15
+    },
+    "PublisherTimeout": {
+      "Description": "Maximum number of seconds allocated to the publisher to complete a single publisher action.",
+      "Type": "Number",
+      "MinValue": 10,
+      "MaxValue": 600,
+      "Default": 20
+    }
+  },
+
+  "Resources": {
+
+    "PublisherStatusTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "codyPublisherStatus",
+        "AttributeDefinitions": [
+          { "AttributeName": "RepositoryName", "AttributeType": "S" }
+        ],
+        "KeySchema": [
+          { "AttributeName": "RepositoryName", "KeyType": "HASH" }
+        ],
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": { "Ref": "PublisherStatusTableProvisionedThroughput" },
+          "WriteCapacityUnits": { "Ref": "PublisherStatusTableProvisionedThroughput" }
+        }
+      }
+    },
+
+    "PublisherActionsQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": "codyPublisherActions",
+        "MaximumMessageSize": 1024,
+        "MessageRetentionPeriod": { "Ref": "PublisherActionsQueueMessageRetentionPeriod" },
+        "ReceiveMessageWaitTimeSeconds": 2,
+        "VisibilityTimeout": { "Ref": "PublisherTimeout" }
+      }
+    },
+
+    "PublisherNotificationsTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "TopicName": "codyPublisherNotifications"
+      }
+    },
+
+    "DLQTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "TopicName": "codyDLQ"
+      }
+    },
+
+    "CommitHandlerRol": {
+      "Type":"AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "codyCommitHandler",
+        "Path": { "Fn::Sub": "/cody/" },
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        ],
+        "Policies": [
+          {
+            "PolicyName": "codyCommitHandlerRole",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "codecommit:GetDifferences"
+                  ],
+                  "Resource": { "Fn::Sub": "arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:*" }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:UpdateItem"
+                  ],
+                  "Resource": { "Fn::GetAtt": [ "PublisherStatusTable", "Arn" ] }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:SendMessage"
+                  ],
+                  "Resource": { "Fn::GetAtt": [ "PublisherActionsQueue", "Arn" ] }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sns:Publish"
+                  ],
+                  "Resource": [
+                    { "Fn::GetAtt": [ "PublisherNotificationsTopic", "Arn" ] },
+                    { "Fn::GetAtt": [ "DLQTopic", "Arn" ] }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+
+    "CommitHandlerLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": "codyCommitHandler",
+        "Description": "Reacts to commits in CodeCommit, queues corresponding publisher actions and triggers the publisher.",
+        "Role": { "Fn::GetAtt": [ "CommitHandlerRole", "Arn" ] },
+        "Code": {
+          "S3Bucket": { "Ref": "LambdaFunctionsBucket" },
+          "S3Key": "cody-commit-handler.zip"
+        },
+        "Runtime": "nodejs8.10",
+        "Handler": "index.handler",
+        "MemorySize": 128,
+        "Timeout": { "Ref": "CommitHandlerTimeout" },
+        "Environment": {
+          "Variables": {
+            "PUBLISHER_STATUS_TABLE_NAME": { "Ref": "PublisherStatusTable" },
+            "PUBLISHER_ACTIONS_QUEUE_URL": { "Ref": "PublisherActionsQueue" },
+            "PUBLISHER_NOTIFICATIONS_TOPIC_ARN": { "Fn::GetAtt": [ "PublisherNotificationsTopic", "Arn" ] }
+          }
+        },
+        "DeadLetterConfig": {
+          "TargetArn": { "Fn::GetAtt": [ "DLQTopic", "Arn" ] }
+        }
+      }
+    },
+
+    "CommitHandlerInvokePemission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": { "Ref": "CommitHandlerLambdaFunction" },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "codecommit.amazonaws.com",
+        "SourceArn": { "Fn::Sub": "arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:*" }
+      }
+    },
+
+    "PublisherRole": {
+      "Type":"AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "codyPublisher",
+        "Path": { "Fn::Sub": "/cody/" },
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        ],
+        "Policies": [
+          {
+            "PolicyName": "codyPublisherRole",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "codecommit:GetBlob"
+                  ],
+                  "Resource": { "Fn::Sub": "arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:*" }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:UpdateItem"
+                  ],
+                  "Resource": { "Fn::GetAtt": [ "PublisherStatusTable", "Arn" ] }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:ReceiveMessage",
+                    "sqs:DeleteMessage"
+                  ],
+                  "Resource": { "Fn::GetAtt": [ "PublisherActionsQueue", "Arn" ] }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sns:Publish"
+                  ],
+                  "Resource": [
+                    { "Fn::GetAtt": [ "PublisherNotificationsTopic", "Arn" ] },
+                    { "Fn::GetAtt": [ "DLQTopic", "Arn" ] }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+
+    "PublisherLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": "codyPublisher",
+        "Description": "Processes publisher actions from the queue and publishes resources in the target S3 bucket.",
+        "Role": { "Fn::GetAtt": [ "PublisherRole", "Arn" ] },
+        "Code": {
+          "S3Bucket": { "Ref": "LambdaFunctionsBucket" },
+          "S3Key": "cody-publisher.zip"
+        },
+        "Runtime": "nodejs8.10",
+        "Handler": "index.handler",
+        "MemorySize": 128,
+        "Timeout": { "Ref": "PublisherTimeout" },
+        "Environment": {
+          "Variables": {
+            "PUBLISHER_STATUS_TABLE_NAME": { "Ref": "PublisherStatusTable" },
+            "PUBLISHER_ACTIONS_QUEUE_URL": { "Ref": "PublisherActionsQueue" },
+            "PUBLISHER_NOTIFICATIONS_TOPIC_ARN": { "Fn::GetAtt": [ "PublisherNotificationsTopic", "Arn" ] },
+            "TARGET_BUCKET": { "Ref": "TargetBucket" },
+            "TARGET_FOLDER": { "Ref": "TargetFolder" }
+          }
+        },
+        "DeadLetterConfig": {
+          "TargetArn": { "Fn::GetAtt": [ "DLQTopic", "Arn" ] }
+        }
+      }
+    },
+
+    "PublisherNotificationsSubscription": {
+      "Type": "AWS::SNS::Subscription",
+      "Properties": {
+        "TopicArn": { "Fn::GetAtt": [ "PublisherNotificationsTopic", "Arn" ] },
+        "Protocol": "lambda",
+        "Endpoint": { "Fn::GetAtt": [ "PublisherLambdaFunction", "Arn" ] }
+      }
+    }
+  },
+
+  "Outputs": {
+    "CommitHandlerArn": {
+      "Description": "ARN of the Lambda function that is used as CodeCommit repository trigger's commit events target.",
+      "Value": { "Fn::GetAtt": [ "CommitHandlerLambdaFunction", "Arn" ] },
+      "Export": {
+        "Name": { "Fn::Sub": "${AWS::StackName}:CommitHandlerArn" }
+      }
+    },
+    "PublisherRoleArn": {
+      "Description": "ARN of the publisher role. The role must be given relevant access to the target S3 bucket.",
+      "Value": { "Fn::GetAtt": [ "PublisherRole", "Arn" ] },
+      "Export": {
+        "Name": { "Fn::Sub": "${AWS::StackName}:PublisherRoleArn" }
+      }
+    },
+    "DLQTopicArn": {
+      "Description": "ARN of the SNS topic for the events failed to be processed by Cody's Lambda functions.",
+      "Value": { "Fn::GetAtt": [ "DLQTopic", "Arn" ] },
+      "Export": {
+        "Name": { "Fn::Sub": "${AWS::StackName}:DLQTopicArn" }
+      }
+    }
+  }
+}
