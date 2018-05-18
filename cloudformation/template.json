@@ -43,6 +43,13 @@
       "MinValue": 10,
       "MaxValue": 600,
       "Default": 20
+    },
+    "LogsRetentionDays": {
+      "Description": "Number of days to keep Lambda function logs in CloudWatch.",
+      "Type": "Number",
+      "MinValue": 1,
+      "MaxValue": 3653,
+      "Default": 14
     }
   },
 
@@ -90,7 +97,7 @@
       }
     },
 
-    "CommitHandlerRol": {
+    "CommitHandlerRole": {
       "Type":"AWS::IAM::Role",
       "Properties": {
         "RoleName": "codyCommitHandler",
@@ -144,8 +151,8 @@
                     "sns:Publish"
                   ],
                   "Resource": [
-                    { "Fn::GetAtt": [ "PublisherNotificationsTopic", "Arn" ] },
-                    { "Fn::GetAtt": [ "DLQTopic", "Arn" ] }
+                    { "Ref": "PublisherNotificationsTopic" },
+                    { "Ref": "DLQTopic" }
                   ]
                 }
               ]
@@ -173,11 +180,11 @@
           "Variables": {
             "PUBLISHER_STATUS_TABLE_NAME": { "Ref": "PublisherStatusTable" },
             "PUBLISHER_ACTIONS_QUEUE_URL": { "Ref": "PublisherActionsQueue" },
-            "PUBLISHER_NOTIFICATIONS_TOPIC_ARN": { "Fn::GetAtt": [ "PublisherNotificationsTopic", "Arn" ] }
+            "PUBLISHER_NOTIFICATIONS_TOPIC_ARN": { "Ref": "PublisherNotificationsTopic" }
           }
         },
         "DeadLetterConfig": {
-          "TargetArn": { "Fn::GetAtt": [ "DLQTopic", "Arn" ] }
+          "TargetArn": { "Ref": "DLQTopic" }
         }
       }
     },
@@ -189,6 +196,14 @@
         "Action": "lambda:InvokeFunction",
         "Principal": "codecommit.amazonaws.com",
         "SourceArn": { "Fn::Sub": "arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:*" }
+      }
+    },
+
+    "CommitHandlerLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": { "Fn::Join": [ "", [ "/aws/lambda/", { "Ref": "CommitHandlerLambdaFunction" } ] ] },
+        "RetentionInDays": { "Ref": "LogsRetentionDays" }
       }
     },
 
@@ -247,8 +262,8 @@
                     "sns:Publish"
                   ],
                   "Resource": [
-                    { "Fn::GetAtt": [ "PublisherNotificationsTopic", "Arn" ] },
-                    { "Fn::GetAtt": [ "DLQTopic", "Arn" ] }
+                    { "Ref": "PublisherNotificationsTopic" },
+                    { "Ref": "DLQTopic" }
                   ]
                 }
               ]
@@ -276,21 +291,39 @@
           "Variables": {
             "PUBLISHER_STATUS_TABLE_NAME": { "Ref": "PublisherStatusTable" },
             "PUBLISHER_ACTIONS_QUEUE_URL": { "Ref": "PublisherActionsQueue" },
-            "PUBLISHER_NOTIFICATIONS_TOPIC_ARN": { "Fn::GetAtt": [ "PublisherNotificationsTopic", "Arn" ] },
+            "PUBLISHER_NOTIFICATIONS_TOPIC_ARN": { "Ref": "PublisherNotificationsTopic" },
             "TARGET_BUCKET": { "Ref": "TargetBucket" },
             "TARGET_FOLDER": { "Ref": "TargetFolder" }
           }
         },
         "DeadLetterConfig": {
-          "TargetArn": { "Fn::GetAtt": [ "DLQTopic", "Arn" ] }
+          "TargetArn": { "Ref": "DLQTopic" }
         }
+      }
+    },
+
+    "PublisherInvokePemission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": { "Ref": "PublisherLambdaFunction" },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "sns.amazonaws.com",
+        "SourceArn": { "Ref": "PublisherNotificationsTopic" }
+      }
+    },
+
+    "PublisherLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": { "Fn::Join": [ "", [ "/aws/lambda/", { "Ref": "PublisherLambdaFunction" } ] ] },
+        "RetentionInDays": { "Ref": "LogsRetentionDays" }
       }
     },
 
     "PublisherNotificationsSubscription": {
       "Type": "AWS::SNS::Subscription",
       "Properties": {
-        "TopicArn": { "Fn::GetAtt": [ "PublisherNotificationsTopic", "Arn" ] },
+        "TopicArn": { "Ref": "PublisherNotificationsTopic" },
         "Protocol": "lambda",
         "Endpoint": { "Fn::GetAtt": [ "PublisherLambdaFunction", "Arn" ] }
       }
@@ -314,7 +347,7 @@
     },
     "DLQTopicArn": {
       "Description": "ARN of the SNS topic for the events failed to be processed by Cody's Lambda functions.",
-      "Value": { "Fn::GetAtt": [ "DLQTopic", "Arn" ] },
+      "Value": { "Ref": "DLQTopic" },
       "Export": {
         "Name": { "Fn::Sub": "${AWS::StackName}:DLQTopicArn" }
       }

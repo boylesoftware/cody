@@ -1,6 +1,8 @@
 {
   "name": "cody-commit-handler",
+  "version": "1.0.0",
   "private": true,
+  "author": "Lev Himmelfarb <lev@boylesoftware.com>",
   "license": "MIT",
   "engines": {
     "node": "~8.10"
