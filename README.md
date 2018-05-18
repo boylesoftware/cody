@@ -6,7 +6,7 @@ _Cody_ is an [Amazon Web Services](https://aws.amazon.com/) solution that automa
 
 _Cody_ is deployed in AWS as an [AWS CloudFormation](https://aws.amazon.com/cloudformation/) stack and uses only serverless AWS components, so once deployed, no maintenance is requried. Below is the solution diagram:
 
-![Diagram](https://raw.githubusercontent.com/boylesoftware/cody/master/docs/img/diagram.svg)
+![Diagram](https://raw.githubusercontent.com/boylesoftware/cody/master/docs/img/diagram.png)
 
 TBD
 
