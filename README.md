@@ -62,7 +62,11 @@ As mentioned earlier, _Cody_ is deployed in an AWS account using [AWS CloudForma
 
    _Cody_'s stack can be also deployed using [AWS Command Line Interface](https://aws.amazon.com/cli/). For example, assuming you've uploaded the Lambda function to a bucket named `my-lambda-functions`, the deployment comment may look like the following:
 
-   `aws cloudformation deploy --template-file ./cloudformation/template.json --stack-name Cody --capabilities CAPABILITY_NAMED_IAM --parameter-overrides LambdaFunctionsBucket="my-lambda-functions" TargetBucket="${repo}" TargetFolder=""`
+   ```shell
+   aws cloudformation deploy --template-file ./cloudformation/template.json --stack-name Cody \
+   --capabilities CAPABILITY_NAMED_IAM \
+   --parameter-overrides LambdaFunctionsBucket="my-lambda-functions" TargetBucket="${repo}" TargetFolder=""
+   ```
 
    Note that we need `CAPABILITY_NAMED_IAM` capability since the stack creates some IAM roles.
 
@@ -90,7 +94,11 @@ As mentioned earlier, _Cody_ is deployed in an AWS account using [AWS CloudForma
 
    ![CodeCommit Trigger](https://raw.githubusercontent.com/boylesoftware/cody/master/docs/img/create-trigger-screen.png)
 
-   In the _Events_ select "Push to existing branch". In _Branch names_ select "master". In _Send to_ select "AWS Lambda". In _Lambda function_ select "codyCommitHandler". Then hit _Create_ button.
+   * In the _Events_ select "Push to existing branch".
+   * In _Branch names_ select "master".
+   * In _Send to_ select "AWS Lambda".
+   * In _Lambda function_ select "codyCommitHandler".
+   * Then hit _Create_ button.
 
 This completes the setup. You can now make some changes to your website content, commit it and push it to the CodeCommit repository's master branch. Upon the push, _Cody_ will publish the content of your repository's `content` subdirectory to your target S3 bucket as configured.
 
