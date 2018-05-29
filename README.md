@@ -60,12 +60,12 @@ As mentioned earlier, _Cody_ is deployed in an AWS account using [AWS CloudForma
    * _TargetBucket_ - This is the name of your target S3 bucket where _Cody_ will be publishing your content from the CodeCommit repository. The name may contain `${repo}` string, which will be replaced by _Cody_ with the name of the CodeCommit repository. This allows using a single _Cody_ deployment for multiple CodeCommit repositories and publish the content in multiple target S3 buckets.
    * _TargetFolder_ - You can configure _Cody_ to publish content under a nested folder in your target S3 bucket. This allows sharing a single bucket for multiple source repositories, which may be a good choice if you host multiple websites and use the S3 bucket as the source for the corresponding CloudFront distributions (a CloudFront distribution allows specifying a folder inside the source S3 bucket). As with the _TargetBucket_ parameter, you can use string `${repo}` in the _TargetFolder_ parameter value as well. If this parameter is left empty, _Cody_ will publish into the root of the target bucket.
 
-   _Cody_'s stack can be also deployed using [AWS Command Line Interface](https://aws.amazon.com/cli/). For example, assuming you've uploaded the Lambda function to a bucket named `my-lambda-functions`, the deployment comment may look like the following:
+   _Cody_'s stack can be also deployed using [AWS Command Line Interface](https://aws.amazon.com/cli/). For example, assuming you've uploaded the Lambda function to a bucket named `my-lambda-funcs`, the deployment comment may look like the following:
 
    ```shell
    aws cloudformation deploy --template-file ./cloudformation/template.json --stack-name Cody \
    --capabilities CAPABILITY_NAMED_IAM \
-   --parameter-overrides LambdaFunctionsBucket="my-lambda-functions" TargetBucket="${repo}" TargetFolder=""
+   --parameter-overrides LambdaFunctionsBucket="my-lambda-funcs" TargetBucket="${repo}" TargetFolder=""
    ```
 
    Note that we need `CAPABILITY_NAMED_IAM` capability since the stack creates some IAM roles.
