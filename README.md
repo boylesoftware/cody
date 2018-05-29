@@ -104,4 +104,8 @@ This completes the setup. You can now make some changes to your website content,
 
 ## Usage
 
-1. perform a commit and push to publish the site
+As mentioned earlier, _Cody_ automatically publishes changes to the files under your CodeCommit repository's `content` subdirectory. In addition to that, your repository's root can include some special files that configure _Cody_'s functionality.
+
+First, you can include `.codyignore` file in the root of you repository. This file has syntax identical to `.gitignore` and can be used to exclude some files under `content` from being processed and published by _Cody_.
+
+Second, you can include `.codyrc` file, which has syntax of an ini file (see [ini](https://www.npmjs.com/package/ini) NPM module for details). Currently, the only supported option is `contentPrefix`, which allows to override the default `content` subdirectory with something else.
