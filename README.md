@@ -14,14 +14,22 @@ The Publisher Lambda function reads publisher actions from the queue one by one 
 
 ## Installation
 
-0. clone git repo
-1. npm install
-2. gulp
-3. upload Lambda zips to S3 bucket
-4. create target S3 bucket
-5. deploy CloudFormation stack
-6. set target S3 bucket policy
-7. associate email with DLQ topic
-8. create CodeCommit repository, make initial commit and push to create master branch
-9. create trigger
-10. perform a commit and push to publish the site
+Prerequisites:
+
+1. create target S3 bucket
+2. create CodeCommit repository, make initial commit and push to create master branch
+
+Build:
+
+1. clone git repo
+2. npm install
+3. gulp
+
+Setup:
+
+1. upload Lambda zips to S3 bucket
+2. deploy CloudFormation stack
+3. set target S3 bucket policy
+4. associate email with DLQ topic
+5. create trigger
+6. perform a commit and push to publish the site

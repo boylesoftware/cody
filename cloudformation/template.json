@@ -126,7 +126,8 @@
                 {
                   "Effect": "Allow",
                   "Action": [
-                    "codecommit:GetDifferences"
+                    "codecommit:GetDifferences",
+                    "codecommit:GetBlob"
                   ],
                   "Resource": { "Fn::Sub": "arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:*" }
                 },
