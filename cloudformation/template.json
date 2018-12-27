@@ -10,18 +10,12 @@
       "AllowedPattern": "[a-z0-9][a-z0-9.-]*"
     },
     "TargetBucket": {
-      "Description": "Name of the S3 bucket for published content. May contain ${repo} as a placeholder for the CodeCommit repository name.",
+      "Description": "Name of the S3 bucket for published content. May contain ${repo} and ${branch} as placeholders for the CodeCommit repository name and the branch respectively.",
       "Type": "String"
     },
     "TargetFolder": {
-      "Description": "Name of the folder in the target S3 bucket for published content, if any. May contain ${repo} as a placeholder for the CodeCommit repository name.",
+      "Description": "Name of the folder in the target S3 bucket for published content, if any. May contain ${repo} and ${branch} as placeholders for the CodeCommit repository name and the branch respectively.",
       "Type": "String"
-    },
-    "PublisherStatusTableProvisionedThroughput": {
-      "Description": "Read and write provisioned throughput in capacity units for the publisher status DynamoDB table.",
-      "Type": "Number",
-      "MinValue": 5,
-      "Default": 5
     },
     "PublisherActionsQueueMessageRetentionPeriod": {
       "Description": "Number of seconds to keep unprocessed publisher actions in the queue before they are discarded.",
@@ -59,16 +53,13 @@
       "Type": "AWS::DynamoDB::Table",
       "Properties": {
         "TableName": "codyPublisherStatus",
+        "BillingMode": "PAY_PER_REQUEST",
         "AttributeDefinitions": [
           { "AttributeName": "RepositoryName", "AttributeType": "S" }
         ],
         "KeySchema": [
           { "AttributeName": "RepositoryName", "KeyType": "HASH" }
-        ],
-        "ProvisionedThroughput": {
-          "ReadCapacityUnits": { "Ref": "PublisherStatusTableProvisionedThroughput" },
-          "WriteCapacityUnits": { "Ref": "PublisherStatusTableProvisionedThroughput" }
-        }
+        ]
       }
     },
 
