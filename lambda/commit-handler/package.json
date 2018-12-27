@@ -8,7 +8,7 @@
     "node": "~8.10"
   },
   "devDependencies": {
-    "eslint": "^4.19.0"
+    "eslint": "^5.11.0"
   },
   "scripts": {
     "test": "eslint ."

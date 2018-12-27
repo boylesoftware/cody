@@ -36,11 +36,12 @@ exports.handler = function(event, _, callback) {
 		const message = data.Messages[0];
 		const action = JSON.parse(message.Body);
 		console.log(`processing publisher action ${message.MessageId}:`, action);
+		const key = `${action.repositoryName}/${action.branchName}`;
 
 		// read current in progress commit id
 		dynamodb.getItem({
 			TableName: process.env.PUBLISHER_STATUS_TABLE_NAME,
-			Key: { 'RepositoryName': { S: action.repositoryName } },
+			Key: { 'RepositoryName': { S: key } },
 			ProjectionExpression: [
 				'NewCommitId',
 				'NewIgnorePatterns',
@@ -70,10 +71,18 @@ exports.handler = function(event, _, callback) {
 				contentPrefix = `${contentPrefix}/`;
 
 			// target bucket name and target key prefix
-			const targetBucket = process.env.TARGET_BUCKET.replace(/\$\{repo\}/g, action.repositoryName);
+			const targetBucket = process.env.TARGET_BUCKET.replace(
+				/\$\{repo\}/g, action.repositoryName
+			).replace(
+				/\$\{branch\}/g, action.branchName
+			);
 			let targetPrefix = (
 				process.env.TARGET_FOLDER && (process.env.TARGET_FOLDER.length > 0) ?
-					process.env.TARGET_FOLDER.replace(/\$\{repo\}/g, action.repositoryName) : ''
+					process.env.TARGET_FOLDER.replace(
+						/\$\{repo\}/g, action.repositoryName
+					).replace(
+						/\$\{branch\}/g, action.branchName
+					) : ''
 			);
 			if ((targetPrefix.length > 0) && !targetPrefix.endsWith('/'))
 				targetPrefix = `${targetPrefix}/`;
@@ -94,7 +103,7 @@ exports.handler = function(event, _, callback) {
 						console.log(`deleting object at ${targetBucket}:${targetPrefix}${path}`);
 						s3.deleteObject({
 							Bucket: targetBucket,
-							Key: targetPrefix + path
+							Key: `${targetPrefix}${path}`
 						}, err => {
 							if (err) {
 								if (err.code === 'InvalidAccessKeyId') {
@@ -125,7 +134,7 @@ exports.handler = function(event, _, callback) {
 						console.log(`uploading ${content.length} bytes to ${targetBucket}:${targetPrefix}${path}`);
 						s3.putObject({
 							Bucket: targetBucket,
-							Key: targetPrefix + path,
+							Key: `${targetPrefix}${path}`,
 							ContentType: mime.getType(path) || 'application/octet-stream',
 							Body: content
 						}, err => {
@@ -149,7 +158,7 @@ exports.handler = function(event, _, callback) {
 			chain.then(() => new Promise((resolve, reject) => {
 				dynamodb.updateItem({
 					TableName: process.env.PUBLISHER_STATUS_TABLE_NAME,
-					Key: { 'RepositoryName': { S: action.repositoryName } },
+					Key: { 'RepositoryName': { S: key } },
 					UpdateExpression: 'SET RemainingActions = RemainingActions - :One',
 					ConditionExpression: 'NewCommitId = :CommitId',
 					ExpressionAttributeValues: {
@@ -174,7 +183,7 @@ exports.handler = function(event, _, callback) {
 			})).then(done => done && new Promise((resolve, reject) => {
 				dynamodb.updateItem({
 					TableName: process.env.PUBLISHER_STATUS_TABLE_NAME,
-					Key: { 'RepositoryName': { S: action.repositoryName } },
+					Key: { 'RepositoryName': { S: key } },
 					UpdateExpression: 'SET ' + [
 						'PublishedCommitId = :CommitId',
 						'PublishedIgnorePatterns = :IgnorePatterns',

@@ -19,14 +19,16 @@ exports.handler = function(event, _, callback) {
 
 		// get repository name and commit id
 		const repositoryName = rec.eventSourceARN.split(':')[5];
-		const commitId = rec.codecommit.references[0].commit;
-		console.log(`publishing repo ${repositoryName} commit ${commitId}`);
+		const ccref = rec.codecommit.references[0];
+		const branchName = ccref.ref.substring('refs/heads/'.length);
+		const commitId = ccref.commit;
+		console.log(`publishing repo ${repositoryName}, branch ${branchName}, commit ${commitId}`);
 
 		// try to get current publisher status for the repository
 		chain = chain.then(() => new Promise((resolve, reject) => {
 			dynamodb.getItem({
 				TableName: process.env.PUBLISHER_STATUS_TABLE_NAME,
-				Key: { 'RepositoryName': { S: repositoryName } },
+				Key: { 'RepositoryName': { S: `${repositoryName}/${branchName}` } },
 				ProjectionExpression: [
 					'PublishedCommitId',
 					'PublishedIgnorePatterns',
@@ -155,7 +157,7 @@ exports.handler = function(event, _, callback) {
 			};
 			dynamodb.updateItem({
 				TableName: process.env.PUBLISHER_STATUS_TABLE_NAME,
-				Key: { 'RepositoryName': { S: repositoryName } },
+				Key: { 'RepositoryName': { S: `${repositoryName}/${branchName}` } },
 				UpdateExpression: 'SET ' + updates.join(', '),
 				ExpressionAttributeValues: values
 			}, err => {
@@ -176,6 +178,7 @@ exports.handler = function(event, _, callback) {
 				queueChain = queueChain.then(() => new Promise((resolve, reject) => {
 					const action = {
 						repositoryName: repositoryName,
+						branchName: branchName,
 						commitId: commitId
 					};
 					if (diff.changeType === 'D') {
