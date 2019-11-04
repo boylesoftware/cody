@@ -164,7 +164,7 @@
           "S3Bucket": { "Ref": "LambdaFunctionsBucket" },
           "S3Key": "cody-commit-handler.zip"
         },
-        "Runtime": "nodejs8.10",
+        "Runtime": "nodejs10.x",
         "Handler": "index.handler",
         "MemorySize": 128,
         "Timeout": { "Ref": "CommitHandlerTimeout" },
@@ -275,7 +275,7 @@
           "S3Bucket": { "Ref": "LambdaFunctionsBucket" },
           "S3Key": "cody-publisher.zip"
         },
-        "Runtime": "nodejs8.10",
+        "Runtime": "nodejs10.x",
         "Handler": "index.handler",
         "MemorySize": 128,
         "Timeout": { "Ref": "PublisherTimeout" },

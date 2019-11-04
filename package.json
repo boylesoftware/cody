@@ -10,9 +10,12 @@
     "url": "git+https://github.com/boylesoftware/cody.git"
   },
   "devDependencies": {
-    "gulp": "^4.0.0",
+    "gulp": "^4.0.2",
     "gulp-install": "^1.1.0",
-    "gulp-load-plugins": "^1.5.0",
+    "gulp-load-plugins": "^1.6.0",
     "gulp-zip": "^4.2.0"
+  },
+  "scripts": {
+    "build": "gulp"
   }
 }
